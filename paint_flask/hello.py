@@ -1,0 +1,72 @@
+from flask import render_template
+from flask import Flask
+from flask import request,url_for
+from flask import redirect,Response
+import psycopg2
+app = Flask(__name__)
+@app.route("/")
+def home():
+	return render_template('paint.html')
+
+
+@app.route("/<imagename>",methods=["GET", "POST"])
+def LoadSaveImage(imagename=None):
+	if request.method=="POST":	
+		conn = psycopg2.connect(database='rainu') 
+		c=conn.cursor()
+		c.execute('INSERT INTO paintrs (name, data) VALUES (%s, %s)',[request.form["pname"],request.form["pdata"]])
+		conn.commit()
+		conn.close()
+		return render_template('paint.html')
+
+	else:
+		if imagename:
+			conn = psycopg2.connect(database='rainu') 
+			c=conn.cursor()
+			filename=(imagename,)
+			t=0
+			c.execute('SELECT name,data FROM paintrs WHERE name=%s',filename)
+			comments=[c.fetchall()]	
+			
+			t=t+1
+			if t>0:		
+				data=""
+				print filename
+				
+				c.execute('SELECT name,data FROM paintrs WHERE name=%s',filename)
+				comments=[c.fetchall()]	
+				print comments
+				
+				name = comments[0][0][0]
+				data = comments[0][0][1]
+					
+				resp = Response("""<script>var data=JSON.parse(' """+data+""" ');</script>"""+render_template("paint.html"), status=200, mimetype='html')
+				return resp					
+			else:
+				return "Image not Found"
+			
+		else:
+			return render_template("paint.html")
+
+
+
+@app.route('/gallery')
+def gallery():
+	conn=psycopg2.connect(database='rainu')
+	c=conn.cursor()
+	c.execute("SELECT * FROM paintrs ORDER BY id desc")
+	posts=[dict(id=i[0],title=i[1]) for i in c.fetchall()]
+	conn.commit()
+	conn.close()	
+	return render_template('gallery.html',posts=posts)
+
+
+@app.route('/gallery/<filename>',methods=['GET'])
+def load(filename=None):
+	return render_template('paint.html')
+		
+
+if __name__ == "__main__":
+    app.debug = True
+    app.run()
+
